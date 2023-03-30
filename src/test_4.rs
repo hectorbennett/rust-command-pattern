@@ -2,32 +2,47 @@ trait Command {
     fn execute(&self);
 }
 
-struct MacroCommand {
+struct History {
+    revision: usize,
     stack: Vec<Box<dyn Command>>,
 }
 
-impl MacroCommand {
-    fn new() -> MacroCommand {
-        MacroCommand { stack: Vec::new() }
+impl History {
+    fn new() -> History {
+        History {
+            revision: 0,
+            stack: Vec::new(),
+        }
     }
 
     fn append(&mut self, cmd: Box<dyn Command>) {
+        self.stack.truncate(self.revision);
         self.stack.push(cmd);
+        self.revision += 1;
     }
 
     fn undo(&mut self) {
-        self.stack.pop();
+        if self.revision > 0 {
+            self.revision -= 1;
+        }
+    }
+
+    fn redo(&mut self) {
+        if self.revision <= self.stack.len() {
+            self.revision += 1;
+        }
     }
 
     fn clear(&mut self) {
         self.stack.clear();
+        self.revision = 0;
     }
 }
 
-impl Command for MacroCommand {
+impl Command for History {
     fn execute(&self) {
-        for command in &self.stack {
-            command.execute();
+        for i in 0..self.revision {
+            self.stack[i].execute();
         }
     }
 }
@@ -74,14 +89,14 @@ impl Drawable for DrawCanvas {
 }
 
 pub fn test_4() {
-    let mut history = MacroCommand::new();
+    let mut history = History::new();
     let canvas = Box::new(DrawCanvas::new());
 
     // TODO
     let cmd1 = Box::new(DrawCommand::new(canvas.clone(), 1, 1));
-    let cmd2 = Box::new(DrawCommand::new(canvas.clone(), 2, 2));
-
     history.append(cmd1);
+
+    let cmd2 = Box::new(DrawCommand::new(canvas.clone(), 2, 2));
     history.append(cmd2);
 
     println!("----------");
@@ -93,7 +108,24 @@ pub fn test_4() {
     history.execute();
     println!();
 
+    println!("--redo--");
+    history.redo();
+    history.execute();
+    println!();
+
+    println!("--undo--");
+    history.undo();
+    history.execute();
+    println!();
+
+    println!("--execute--");
+    let cmd3 = Box::new(DrawCommand::new(canvas.clone(), 3, 3));
+    history.append(cmd3);
+    history.execute();
+    println!();
+
     println!("---clear---");
     history.clear();
     history.execute();
+
 }
